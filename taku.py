@@ -17,6 +17,9 @@ class Taku:
         self.dora_hyouji = []
         self.dora_hyouji.append(self.yama[-(6 + self.kancounter * 2)])
 
+        # 場に出たリー棒をカウントする
+        self.riibou = 0
+
     # カンした際に実行 カンドラが増える(カン自体は未実装)
     def kan(self):
         self.kancounter += 1

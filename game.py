@@ -62,8 +62,9 @@ class Game:
         self.ryukyoku = False
         self.agari = False
         self.tobi = False
+        
         for i in range(4):
-            self.janshi[i].riichi == False
+            self.janshi[i].riichi = False    
 
         self.oya = (self.oya + self.taku.kyoku - 1) % 4
         self.kazegime()
@@ -89,20 +90,23 @@ class Game:
 
         # 高速で流れて見づらいため入力待機
         if self.play:
-            input('Press any key')
+            input('Press Enter')
 
     # 和了時の処理
     def agari_shori(self, agari_idx, tsumo):
-        print(self.janshi[agari_idx].name + 'の和了')
+        janshi = self.janshi[agari_idx]
+        print(janshi.name + 'の和了')
 
-        result = rule.Rule.agari(self.janshi[agari_idx].tehai, self.taku.dora_hyouji, tsumo, self.janshi[agari_idx].riichi, self.janshi[agari_idx].jikaze, self.taku.bakaze)
+        result = rule.Rule.agari(janshi.tehai, self.taku.dora_hyouji, tsumo, janshi.riichi, janshi.jikaze, self.taku.bakaze)
         print(result.yaku)
         print(str(result.fu) + '符' + str(result.han) + '翻')
-        if self.janshi[agari_idx].jikaze == EAST:
+        if janshi.jikaze == EAST:
             print(str(result.cost['main']) + 'オール\n')
         else:
             print(str(result.cost['main']), str(result.cost['additional']) + '点\n')
-        self.janshi[agari_idx].get_tenbou(result.cost['main'] + result.cost['additional'] * 2)
+        janshi.get_tenbou(result.cost['main'] + result.cost['additional'] * 2)
+        janshi.get_tenbou(self.taku.riibou * 1000)
+        self.taku.riibou = 0
         
         for i in range(4):
             if i != agari_idx:
@@ -142,7 +146,54 @@ class Game:
                 self.tobi = True
         print('\n')
         if self.play:
-            input('Press any key')
+            input('Press Enter')
+
+    # プレイヤーの順番のときの入力処理
+    def player_choice(self, player_idx, shantensu):
+        janshi = self.janshi[player_idx]
+        riichi = False
+
+        # 立直できる状況のときの処理
+        if shantensu == 0 and not janshi.riichi and len(self.taku.yama) > 17:
+            temp = input('立直しますか?(Y/N) : ')
+            if temp == 'Y' or temp == 'y':
+                riichi = True
+
+        # 立直するときの入力処理
+        if riichi:
+            riichi_idx = janshi.riichi_idx()
+            while 1:
+                try:
+                    print(riichi_idx)
+                    txt = '捨て牌の番号を入力してください' + str(riichi_idx) + ' : '
+                    sutehai = int(input(txt))
+                except ValueError:
+                    print('半角の整数で入力してください')
+                if not sutehai in riichi_idx:
+                    print('その牌では立直できません')
+                else:
+                    break
+
+        # すでに立直しているときはツモ切りを実行
+        elif janshi.riichi:
+            input('ツモ切りします(Press Enter) ')
+            sutehai = 13
+
+        # 通常時の処理
+        else:
+            while 1:
+                try:
+                    sutehai = int(input('捨て牌の番号を入力してください(0~13) : '))
+                except ValueError:
+                    print('0から13の整数を半角で入力してください')
+                if sutehai < 0 or 13 < sutehai:
+                    print('0から13の整数を入力してください')
+                else:
+                    break
+
+        # このメソッド内でjanshi.riichiをTrueにしてしまうと立直時にツモ切りしてしまうため
+        # riichiを戻し打牌処理を行ってからjanshi.riichiをTrueにする
+        return sutehai, riichi
 
 
     # 1巡における処理
@@ -151,48 +202,67 @@ class Game:
         for i in range(4):
             # 東→南→西→北の巡で処理を行うための変数
             idx = (self.oya + i) % 4
+            janshi = self.janshi[idx]  #参照渡し
 
-            print(self.janshi[idx].jikaze_str + '(' + self.janshi[idx].name + ')' + 'の手番')
+            print(janshi.jikaze_str + '(' + janshi.name + ')' + 'の手番')
 
             if self.kansen:
-                print([hai.str for hai in self.janshi[idx].tehai], end=' ')
-            elif self.janshi[idx].play:
-                print([str(j) + ': ' + self.janshi[idx].tehai[j].str for j in range(len(self.janshi[idx].tehai))], end=' ')
+                print([hai.str for hai in janshi.tehai], end=' ')
+            elif janshi.play:
+                print([str(j) + ': ' + janshi.tehai[j].str for j in range(len(janshi.tehai))], end=' ')
 
-            tsumohai = self.janshi[idx].tsumo(self.taku.yama)
+            tsumohai = janshi.tsumo(self.taku.yama)
 
             if self.kansen:
                 print(tsumohai.str)
-            elif self.janshi[idx].play:
+            elif janshi.play:
                 print('13: ' + tsumohai.str)
 
-            shantensu = rule.Rule.shantensuu(self.janshi[idx].tehai)
+            shantensu = rule.Rule.shantensuu(janshi.tehai)
 
-            # 副露, ロン, 振聴は未実装のため向聴数-1で強制的に和了
+            # 副露, ロン, 振聴は未実装のため向聴数-1でNPCは強制的に和了
             if shantensu == -1:
-                self.agari_shori(idx, tsumo=True)
-                self.agari = True
-                self.finish_kyoku()
-                break
+                agari = False
+                if janshi.play:
+                    temp = input('和了しますか?(Y/N) : ')
+                    if temp =='Y' or temp == 'y':
+                        agari = True
+                else:
+                    agari =True
+                if agari:
+                    self.agari_shori(idx, tsumo=True)
+                    self.agari = True
+                    self.finish_kyoku()
+                    break
 
-            if self.kansen or self.janshi[idx].play:
-                print(str(shantensu) + '向聴')
+            if self.kansen or janshi.play:
+                if shantensu == 0:
+                    print('聴牌')
+                else:
+                    print(str(shantensu) + '向聴')
 
-            if self.janshi[idx].play:
-                while 1:
-                    try:
-                        sutehai = int(input('捨て牌の番号を入力してください(0~13) : '))
-                    except ValueError:
-                        print('0から13の整数を半角で入力してください')
-                    if sutehai < 0 or 13 < sutehai:
-                        print('0から13の整数を入力してください')
-                    else:
-                        break
-                    
+            riichi = False
+
+            # プレイヤーの行動選択処理
+            if janshi.play:
+                sutehai, riichi = self.player_choice(idx, shantensu)
+            
+            # NPCの行動選択処理
             else:
+                # 聴牌し、山が残り17牌以上なら強制的に立直する
+                if shantensu == 0 and not janshi.riichi and len(self.taku.yama) > 17:
+                    print(janshi.jikaze_str + 'のリーチ')
+                    riichi = True
                 sutehai = 13
 
-            print('打 ' + self.janshi[idx].dahai(sutehai).str)
+            # 打牌処理と打牌の表示
+            print('打 ' + janshi.dahai(sutehai).str)
+                
+            # リーチ時の処理
+            if riichi:
+                janshi.lost_tenbou(1000)
+                self.taku.riibou += 1
+                janshi.riichi = True
 
             # 山が残り14牌になったら流局処理
             if len(self.taku.yama) == 14:
@@ -202,12 +272,7 @@ class Game:
                 self.finish_kyoku()
                 break
 
-            # 聴牌し、山が残り17牌以上なら強制的に立直する
-            if shantensu == 0 and self.janshi[idx].riichi == False and len(self.taku.yama) > 17:
-                print(self.janshi[idx].jikaze_str + 'のリーチ')
-                self.janshi[idx].riichi = True
-
-            self.janshi[idx].riipai()
+            janshi.riipai()
             print('\n')
         self.junme += 1
 

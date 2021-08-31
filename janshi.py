@@ -47,7 +47,7 @@ class Janshi:
     # 打牌を行う
     def dahai(self, sutehai=13):
         # 立直状態での処理
-        if self.riichi == True:
+        if self.riichi:
                 hai = self.tehai[13]
                 del self.tehai[13]
                 return hai
@@ -67,3 +67,12 @@ class Janshi:
             del self.tehai[shantenvalue.index(min(shantenvalue))]
             self.kawa.append(hai)
         return hai
+
+    # 手牌中の立直時に打牌できる牌(打牌した際に向聴数が0となる牌)のインデックスを返す
+    def riichi_idx(self):
+        riichi_idx = []
+        for i in range(len(self.tehai)):
+            shantensuu = rule.Rule.shantensuu(self.tehai[:i] + self.tehai[i + 1:])
+            if shantensuu == 0:
+                riichi_idx.append(i)
+        return riichi_idx
